@@ -664,21 +664,6 @@ func (r *OVNDBClusterReconciler) reconcileNormal(ctx context.Context, instance *
 		instance.Status.ReadyCount = stateful.Status.ReadyReplicas
 	}
 
-	// Only run runtime config when all pods are ready and no rolling update in progress
-	if instance.Status.ReadyCount == *instance.Spec.Replicas &&
-		stateful.Status.UpdatedReplicas == *instance.Spec.Replicas {
-		err = r.reconcileRuntimeConfig(ctx, helper, instance, serviceLabels, serviceName)
-		if err != nil {
-			instance.Status.Conditions.Set(condition.FalseCondition(
-				condition.ServiceConfigReadyCondition,
-				condition.ErrorReason,
-				condition.SeverityWarning,
-				condition.ServiceConfigReadyErrorMessage,
-				err.Error()))
-			return ctrl.Result{}, err
-		}
-	}
-
 	// verify if network attachment matches expectations
 	networkReady, networkAttachmentStatus, err := nad.VerifyNetworkStatusFromAnnotation(ctx, helper, networkAttachments, serviceLabels, instance.Status.ReadyCount)
 	if err != nil {
@@ -734,6 +719,21 @@ func (r *OVNDBClusterReconciler) reconcileNormal(ctx context.Context, instance *
 			condition.ExposeServiceReadyErrorMessage,
 			err.Error()))
 		return ctrl.Result{}, err
+	}
+
+	// Only run runtime config when all pods are ready and no rolling update in progress
+	if instance.Status.ReadyCount == *instance.Spec.Replicas &&
+		stateful.Status.UpdatedReplicas == *instance.Spec.Replicas {
+		err = r.reconcileRuntimeConfig(ctx, helper, instance, serviceLabels, serviceName)
+		if err != nil {
+			instance.Status.Conditions.Set(condition.FalseCondition(
+				condition.ServiceConfigReadyCondition,
+				condition.ErrorReason,
+				condition.SeverityWarning,
+				condition.ServiceConfigReadyErrorMessage,
+				err.Error()))
+			return ctrl.Result{}, err
+		}
 	}
 
 	if statefulset.IsReady(stateful) && len(svcList.Items) > 0 {
